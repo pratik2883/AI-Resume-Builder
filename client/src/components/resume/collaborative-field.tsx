@@ -42,7 +42,9 @@ export function CollaborativeField({
   const [comment, setComment] = useState('');
   const [commentOpen, setCommentOpen] = useState(false);
   const lastUpdateRef = useRef<NodeJS.Timeout | null>(null);
-  const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  // Using separate refs for Input and Textarea
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   // Subscribe to content updates for this field
   useContentSubscription(sectionId, (newContent) => {
@@ -104,16 +106,28 @@ export function CollaborativeField({
       
       <div className="flex">
         <CollaborativeCursorWrapper resumeId={resumeId} sectionId={sectionId}>
-          <FieldComponent
-            ref={fieldRef}
-            value={localValue}
-            onChange={handleChange}
-            onSelect={handleSelection}
-            onFocus={handleSelection}
-            placeholder={placeholder}
-            rows={multiline ? rows : undefined}
-            className="w-full pr-8"
-          />
+          {multiline ? (
+            <Textarea
+              ref={textareaRef}
+              value={localValue}
+              onChange={handleChange}
+              onSelect={handleSelection}
+              onFocus={handleSelection}
+              placeholder={placeholder}
+              rows={rows}
+              className="w-full pr-8"
+            />
+          ) : (
+            <Input
+              ref={inputRef}
+              value={localValue}
+              onChange={handleChange}
+              onSelect={handleSelection}
+              onFocus={handleSelection}
+              placeholder={placeholder}
+              className="w-full pr-8"
+            />
+          )}
         </CollaborativeCursorWrapper>
         
         <Popover open={commentOpen} onOpenChange={setCommentOpen}>

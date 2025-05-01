@@ -7,10 +7,11 @@ import ResumeForm from "@/components/resume/resume-form";
 import ResumePreview from "@/components/resume/resume-preview";
 import SavedResumes from "@/components/resume/saved-resumes";
 import AiPromptBar from "@/components/resume/ai-prompt-bar";
+import { CollaborationPanel } from "@/components/resume/collaboration-panel";
 import { ResumeContent, EducationItem, ExperienceItem, SkillItem, ProjectItem } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2 } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 // Default empty resume
@@ -231,7 +232,7 @@ export default function DashboardPage() {
                       />
                     </div>
                     
-                    <div className="w-full lg:w-1/3">
+                    <div className="w-full lg:w-1/3 flex flex-col gap-6">
                       <ResumePreview
                         resumeContent={resumeContent}
                         selectedTemplate={selectedTemplate}
@@ -240,6 +241,17 @@ export default function DashboardPage() {
                         resumeName={resumeName}
                         resumeId={currentResumeId}
                       />
+                      
+                      {/* Show collaboration panel only when working on a saved resume */}
+                      {currentResumeId && (
+                        <div>
+                          <h3 className="text-lg font-medium mb-4 flex items-center">
+                            <Users className="h-5 w-5 mr-2" />
+                            Collaborative Editing
+                          </h3>
+                          <CollaborationPanel resumeId={currentResumeId} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </TabsContent>

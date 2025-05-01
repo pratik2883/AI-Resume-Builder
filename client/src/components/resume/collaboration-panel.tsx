@@ -82,7 +82,7 @@ export function CollaborationPanel({ resumeId }: CollaborationPanelProps) {
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-medium">Collaboration</h3>
         <div className="flex items-center gap-2">
-          <Badge variant={isConnected ? "success" : "destructive"}>
+          <Badge variant={isConnected ? "outline" : "destructive"} className={isConnected ? "text-green-500 border-green-500" : ""}>
             {isConnected ? "Connected" : "Disconnected"}
           </Badge>
           <Button size="sm" variant="outline" onClick={() => setShowShareDialog(true)}>

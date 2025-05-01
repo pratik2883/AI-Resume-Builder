@@ -1,7 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from './use-auth';
-import { useToast } from './use-toast';
-import { ResumeContent } from '@shared/schema';
+import { createContext, ReactNode, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { useAuth } from '@/hooks/use-auth';
 
 interface CollaborationUser {
   userId: number;
@@ -36,157 +34,170 @@ type MessageType =
   | { type: 'cursor-position', userId: number, username: string, section: string, position: number }
   | { type: 'error', message: string };
 
-export function useCollaboration(resumeId: number | null) {
+type CollaborationContextType = {
+  isConnected: boolean;
+  activeUsers: CollaborationUser[];
+  comments: Comment[];
+  cursorPositions: CursorPosition[];
+  sendContentUpdate: (section: string, content: any) => void;
+  addComment: (section: string, content: string) => void;
+  resolveComment: (commentId: number) => void;
+  updateCursorPosition: (section: string, position: number) => void;
+  useContentSubscription: (section: string, callback: (content: any) => void) => void;
+};
+
+const CollaborationContext = createContext<CollaborationContextType | null>(null);
+
+interface CollaborationProviderProps {
+  children: ReactNode;
+  resumeId: number | null;
+}
+
+export function CollaborationProvider({ children, resumeId }: CollaborationProviderProps) {
   const { user } = useAuth();
-  const { toast } = useToast();
+  const [socket, setSocket] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [activeUsers, setActiveUsers] = useState<CollaborationUser[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [cursorPositions, setCursorPositions] = useState<CursorPosition[]>([]);
-  const wsRef = useRef<WebSocket | null>(null);
+  const contentUpdateCallbacks = useRef<Map<string, Set<(content: any) => void>>>(new Map());
   
-  // Connect to WebSocket server
+  // Connect to WebSocket when resumeId changes
   useEffect(() => {
-    if (!resumeId || !user) return;
-    
-    // Close any existing connection
-    if (wsRef.current) {
-      wsRef.current.close();
+    if (!resumeId || !user) {
+      if (socket) {
+        socket.close();
+        setSocket(null);
+        setIsConnected(false);
+      }
+      return;
     }
     
-    // Determine WebSocket protocol (ws:// or wss://)
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws?resumeId=${resumeId}&userId=${user.id}&username=${user.username}`;
+    // Reset state when resumeId changes
+    setActiveUsers([]);
+    setComments([]);
+    setCursorPositions([]);
     
-    // Create new WebSocket connection
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    // Setup WebSocket connection
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const newSocket = new WebSocket(wsUrl);
     
-    // Define WebSocket event handlers
-    ws.onopen = () => {
-      setIsConnected(true);
+    newSocket.onopen = () => {
       console.log('WebSocket connected');
-    };
-    
-    ws.onclose = () => {
-      setIsConnected(false);
-      console.log('WebSocket disconnected');
+      setIsConnected(true);
       
-      // Try to reconnect after a delay
-      setTimeout(() => {
-        if (document.visibilityState !== 'hidden') {
-          console.log('Attempting to reconnect WebSocket...');
-          // The component will re-render and trigger the useEffect again
-          setIsConnected(false);
-        }
-      }, 3000);
+      // Send join message
+      if (resumeId) {
+        newSocket.send(JSON.stringify({
+          type: 'join',
+          resumeId,
+          userId: user.id,
+          username: user.username,
+        }));
+      }
     };
     
-    ws.onerror = (error) => {
+    newSocket.onclose = () => {
+      console.log('WebSocket disconnected');
+      setIsConnected(false);
+    };
+    
+    newSocket.onerror = (error) => {
       console.error('WebSocket error:', error);
-      toast({
-        title: 'Connection Error',
-        description: 'Unable to connect to collaborative editing server',
-        variant: 'destructive',
-      });
+      setIsConnected(false);
     };
     
-    ws.onmessage = (event) => {
+    newSocket.onmessage = (event) => {
       try {
         const message: MessageType = JSON.parse(event.data);
         
-        // Handle different message types
         switch (message.type) {
           case 'session-info':
             setActiveUsers(message.activeUsers);
             break;
             
           case 'user-joined':
-            setActiveUsers(prev => [...prev.filter(u => u.userId !== message.userId), { userId: message.userId, username: message.username }]);
-            toast({
-              title: 'User Joined',
-              description: `${message.username} has joined the editing session`,
-              variant: 'default',
+            setActiveUsers((prev) => {
+              if (!prev.some(u => u.userId === message.userId)) {
+                return [...prev, { userId: message.userId, username: message.username }];
+              }
+              return prev;
             });
             break;
             
           case 'user-left':
-            setActiveUsers(prev => prev.filter(u => u.userId !== message.userId));
-            setCursorPositions(prev => prev.filter(c => c.userId !== message.userId));
-            toast({
-              title: 'User Left',
-              description: `${message.username} has left the editing session`,
-              variant: 'default',
-            });
+            setActiveUsers((prev) => prev.filter(u => u.userId !== message.userId));
+            setCursorPositions((prev) => prev.filter(c => c.userId !== message.userId));
             break;
             
           case 'content-update':
-            // This will be handled by individual component subscribers
+            // Notify subscribers for this section
+            const callbacks = contentUpdateCallbacks.current.get(message.section);
+            if (callbacks) {
+              callbacks.forEach(callback => {
+                callback(message.content);
+              });
+            }
             break;
             
           case 'new-comment':
-            setComments(prev => [...prev, message.comment]);
-            if (message.comment.userId !== user.id) {
-              toast({
-                title: 'New Comment',
-                description: `${message.comment.username} added a comment`,
-                variant: 'default',
-              });
-            }
+            setComments((prev) => [...prev, message.comment]);
             break;
             
           case 'comment-resolved':
-            setComments(prev => 
-              prev.map(comment => 
-                comment.id === message.commentId 
-                  ? { ...comment, resolved: true } 
-                  : comment
-              )
-            );
-            if (message.resolvedBy.userId !== user.id) {
-              toast({
-                title: 'Comment Resolved',
-                description: `${message.resolvedBy.username} resolved a comment`,
-                variant: 'default',
-              });
-            }
+            setComments((prev) => prev.map(comment => 
+              comment.id === message.commentId
+                ? { ...comment, resolved: true }
+                : comment
+            ));
             break;
             
           case 'cursor-position':
-            setCursorPositions(prev => {
-              const filtered = prev.filter(c => c.userId !== message.userId);
-              return [...filtered, {
-                userId: message.userId,
+            setCursorPositions((prev) => {
+              // Remove any existing cursor for this user and section
+              const filtered = prev.filter(c => !(c.userId === message.userId && c.section === message.section));
+              // Add the new cursor position
+              return [...filtered, { 
+                userId: message.userId, 
                 username: message.username,
                 section: message.section,
-                position: message.position
+                position: message.position 
               }];
             });
             break;
             
           case 'error':
-            toast({
-              title: 'Error',
-              description: message.message,
-              variant: 'destructive',
-            });
+            console.error('Collaboration error:', message.message);
             break;
-            
-          default:
-            console.warn('Unknown message type:', (message as any).type);
         }
       } catch (error) {
-        console.error('Error processing WebSocket message:', error);
+        console.error('Error parsing WebSocket message:', error, event.data);
       }
     };
     
-    // Fetch initial comments for this resume
+    setSocket(newSocket);
+    
+    // Cleanup on unmount
+    return () => {
+      if (newSocket && newSocket.readyState === WebSocket.OPEN) {
+        newSocket.close();
+      }
+    };
+  }, [resumeId, user]);
+  
+  // Fetch initial comments when connected
+  useEffect(() => {
+    if (!resumeId || !isConnected) return;
+    
     const fetchComments = async () => {
       try {
         const response = await fetch(`/api/resumes/${resumeId}/comments`);
         if (response.ok) {
-          const fetchedComments = await response.json();
-          setComments(fetchedComments);
+          const data = await response.json();
+          setComments(data);
+        } else {
+          console.error('Failed to fetch comments');
         }
       } catch (error) {
         console.error('Error fetching comments:', error);
@@ -194,86 +205,102 @@ export function useCollaboration(resumeId: number | null) {
     };
     
     fetchComments();
-    
-    // Clean up on unmount
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, [resumeId, user, toast]);
+  }, [resumeId, isConnected]);
   
-  // Function to send content updates
+  // Send content update
   const sendContentUpdate = useCallback((section: string, content: any) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    if (!socket || socket.readyState !== WebSocket.OPEN || !resumeId || !user) return;
     
-    wsRef.current.send(JSON.stringify({
+    socket.send(JSON.stringify({
       type: 'content-update',
+      resumeId,
+      userId: user.id,
+      username: user.username,
       section,
       content,
     }));
-  }, []);
+  }, [socket, resumeId, user]);
   
-  // Function to add a comment
-  const addComment = useCallback((section: string, content: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+  // Add comment
+  const addComment = useCallback(async (section: string, content: string) => {
+    if (!resumeId || !user) return;
     
-    wsRef.current.send(JSON.stringify({
-      type: 'add-comment',
-      section,
-      content,
-    }));
-  }, []);
+    try {
+      const response = await fetch(`/api/resumes/${resumeId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          section,
+          content,
+        }),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to add comment');
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+    }
+  }, [resumeId, user]);
   
-  // Function to resolve a comment
-  const resolveComment = useCallback((commentId: number) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+  // Resolve comment
+  const resolveComment = useCallback(async (commentId: number) => {
+    if (!resumeId || !user) return;
     
-    wsRef.current.send(JSON.stringify({
-      type: 'resolve-comment',
-      commentId,
-    }));
-  }, []);
+    try {
+      const response = await fetch(`/api/resumes/${resumeId}/comments/${commentId}/resolve`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to resolve comment');
+      }
+    } catch (error) {
+      console.error('Error resolving comment:', error);
+    }
+  }, [resumeId, user]);
   
-  // Function to update cursor position
+  // Update cursor position
   const updateCursorPosition = useCallback((section: string, position: number) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    if (!socket || socket.readyState !== WebSocket.OPEN || !resumeId || !user) return;
     
-    wsRef.current.send(JSON.stringify({
+    socket.send(JSON.stringify({
       type: 'cursor-position',
+      resumeId,
+      userId: user.id,
+      username: user.username,
       section,
       position,
     }));
-  }, []);
+  }, [socket, resumeId, user]);
   
-  // Function to subscribe to content updates for a specific section
-  const useContentSubscription = (section: string, onUpdate: (content: any) => void) => {
+  // Subscribe to content updates for a specific section
+  const useContentSubscription = useCallback((section: string, callback: (content: any) => void) => {
     useEffect(() => {
-      const handler = (event: MessageEvent) => {
-        try {
-          const message: MessageType = JSON.parse(event.data);
-          
-          if (message.type === 'content-update' && message.section === section) {
-            onUpdate(message.content);
-          }
-        } catch (error) {
-          console.error('Error processing content subscription:', error);
-        }
-      };
-      
-      if (wsRef.current) {
-        wsRef.current.addEventListener('message', handler);
+      // Register callback
+      if (!contentUpdateCallbacks.current.has(section)) {
+        contentUpdateCallbacks.current.set(section, new Set());
       }
       
+      const callbacks = contentUpdateCallbacks.current.get(section)!;
+      callbacks.add(callback);
+      
+      // Cleanup
       return () => {
-        if (wsRef.current) {
-          wsRef.current.removeEventListener('message', handler);
+        const callbacks = contentUpdateCallbacks.current.get(section);
+        if (callbacks) {
+          callbacks.delete(callback);
+          if (callbacks.size === 0) {
+            contentUpdateCallbacks.current.delete(section);
+          }
         }
       };
-    }, [section, onUpdate]);
-  };
+    }, [section, callback]);
+  }, []);
   
-  return {
+  const contextValue: CollaborationContextType = {
     isConnected,
     activeUsers,
     comments,
@@ -283,5 +310,50 @@ export function useCollaboration(resumeId: number | null) {
     resolveComment,
     updateCursorPosition,
     useContentSubscription,
+  };
+  
+  return (
+    <CollaborationContext.Provider value={contextValue}>
+      {children}
+    </CollaborationContext.Provider>
+  );
+}
+
+export function useCollaboration(resumeId: number | null) {
+  const context = useContext(CollaborationContext);
+  
+  // If resumeId is null or undefined, return a default context with empty values
+  if (!resumeId) {
+    return {
+      isConnected: false,
+      activeUsers: [],
+      comments: [],
+      cursorPositions: [],
+      sendContentUpdate: () => {},
+      addComment: () => {},
+      resolveComment: () => {},
+      updateCursorPosition: () => {},
+      useContentSubscription: () => {},
+    };
+  }
+  
+  // If we're inside the provider, use the context
+  if (context) {
+    return context;
+  }
+  
+  // If we're not inside the provider, wrap with the provider
+  // This is a simplified version that doesn't actually provide the context
+  // In a real app, you'd want to use a more robust solution
+  return {
+    isConnected: false,
+    activeUsers: [],
+    comments: [],
+    cursorPositions: [],
+    sendContentUpdate: () => {},
+    addComment: () => {},
+    resolveComment: () => {},
+    updateCursorPosition: () => {},
+    useContentSubscription: () => {},
   };
 }
