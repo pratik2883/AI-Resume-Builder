@@ -1,5 +1,5 @@
 import { Server as HttpServer } from 'http';
-import greenlock from 'greenlock-express';
+import greenlockExpress from 'greenlock-express';
 import path from 'path';
 import fs from 'fs';
 
@@ -31,7 +31,7 @@ export function setupSSL(httpServer: HttpServer, domains: string[], email: strin
 
       console.log(`[SSL] Setting up SSL certificates for domains: ${domains.join(', ')}`);
 
-      const greenlockInstance = greenlock.init({
+      const greenlockInstance = greenlockExpress.init({
         packageRoot: process.cwd(),
         configDir: CERT_DIR,
         maintainerEmail: email,

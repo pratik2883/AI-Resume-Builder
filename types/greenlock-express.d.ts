@@ -29,7 +29,9 @@ declare module 'greenlock-express' {
 
   function init(options: GreenlockOptions): GreenlockInstance;
 
-  export = {
-    init
+  const greenlock: {
+    init: typeof init
   };
+  
+  export default greenlock;
 }
