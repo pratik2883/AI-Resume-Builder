@@ -13,6 +13,7 @@ import ManageUsers from "@/pages/admin/manage-users";
 import ManageResumes from "@/pages/admin/manage-resumes";
 import ApiKeys from "@/pages/admin/api-keys";
 import { AuthProvider } from "@/hooks/use-auth";
+import { CollaborationProvider } from "@/hooks/use-collaboration";
 import { ProtectedRoute } from "@/lib/protected-route";
 
 function Router() {
@@ -36,8 +37,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router />
-        <Toaster />
+        <CollaborationProvider resumeId={null}>
+          <Router />
+          <Toaster />
+        </CollaborationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

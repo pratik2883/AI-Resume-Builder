@@ -94,8 +94,6 @@ export function CollaborativeField({
     }
   };
   
-  const FieldComponent = multiline ? Textarea : Input;
-  
   return (
     <div className="relative group">
       {label && (
