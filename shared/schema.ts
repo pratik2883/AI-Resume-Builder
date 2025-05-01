@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -159,3 +159,82 @@ export type EducationItem = z.infer<typeof educationItemSchema>;
 export type ExperienceItem = z.infer<typeof experienceItemSchema>;
 export type SkillItem = z.infer<typeof skillItemSchema>;
 export type ProjectItem = z.infer<typeof projectItemSchema>;
+
+// Resume Collaborators
+export const resumeCollaborators = pgTable("resume_collaborators", {
+  id: serial("id").primaryKey(),
+  resumeId: integer("resume_id").references(() => resumes.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  permission: text("permission").notNull(), // 'view', 'edit', 'comment'
+  invitedAt: timestamp("invited_at").defaultNow().notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const resumeCollaboratorsRelations = relations(resumeCollaborators, ({ one }) => ({
+  resume: one(resumes, { fields: [resumeCollaborators.resumeId], references: [resumes.id] }),
+  user: one(users, { fields: [resumeCollaborators.userId], references: [users.id] }),
+}));
+
+export const insertResumeCollaboratorSchema = createInsertSchema(resumeCollaborators, {
+  permission: (schema) => schema.refine(
+    val => ['view', 'edit', 'comment'].includes(val),
+    "Permission must be 'view', 'edit', or 'comment'"
+  ),
+});
+
+export type InsertResumeCollaborator = z.infer<typeof insertResumeCollaboratorSchema>;
+export const resumeCollaboratorSelectSchema = createSelectSchema(resumeCollaborators);
+export type ResumeCollaborator = z.infer<typeof resumeCollaboratorSelectSchema>;
+
+// Resume Comments
+export const resumeComments = pgTable("resume_comments", {
+  id: serial("id").primaryKey(),
+  resumeId: integer("resume_id").references(() => resumes.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  content: text("content").notNull(),
+  section: text("section").notNull(), // Which section of the resume (e.g., 'personalInfo', 'education.0', etc.)
+  resolved: boolean("resolved").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const resumeCommentsRelations = relations(resumeComments, ({ one }) => ({
+  resume: one(resumes, { fields: [resumeComments.resumeId], references: [resumes.id] }),
+  user: one(users, { fields: [resumeComments.userId], references: [users.id] }),
+}));
+
+export const insertResumeCommentSchema = createInsertSchema(resumeComments, {
+  content: (schema) => schema.min(1, "Comment content cannot be empty"),
+});
+
+export type InsertResumeComment = z.infer<typeof insertResumeCommentSchema>;
+export const resumeCommentSelectSchema = createSelectSchema(resumeComments);
+export type ResumeComment = z.infer<typeof resumeCommentSelectSchema>;
+
+// Resume Edit History
+export const resumeEditHistory = pgTable("resume_edit_history", {
+  id: serial("id").primaryKey(),
+  resumeId: integer("resume_id").references(() => resumes.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  contentSnapshot: jsonb("content_snapshot").notNull(),
+  section: text("section").notNull(), // Which section was edited
+  action: text("action").notNull(), // 'add', 'update', 'delete'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const resumeEditHistoryRelations = relations(resumeEditHistory, ({ one }) => ({
+  resume: one(resumes, { fields: [resumeEditHistory.resumeId], references: [resumes.id] }),
+  user: one(users, { fields: [resumeEditHistory.userId], references: [users.id] }),
+}));
+
+export const insertResumeEditHistorySchema = createInsertSchema(resumeEditHistory, {
+  action: (schema) => schema.refine(
+    val => ['add', 'update', 'delete'].includes(val),
+    "Action must be 'add', 'update', or 'delete'"
+  ),
+});
+
+export type InsertResumeEditHistory = z.infer<typeof insertResumeEditHistorySchema>;
+export const resumeEditHistorySelectSchema = createSelectSchema(resumeEditHistory);
+export type ResumeEditHistory = z.infer<typeof resumeEditHistorySelectSchema>;
