@@ -11,6 +11,38 @@
     @apply font-sans antialiased bg-gray-50 text-gray-900;
   }
 
+  @keyframes blob {
+    0% {
+      transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+      transform: translate(30px, -50px) scale(1.1);
+    }
+    66% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
+    100% {
+      transform: translate(0px, 0px) scale(1);
+    }
+  }
+
+  .animate-blob {
+    animation: blob 7s infinite;
+  }
+
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+  
+  .bg-grid-primary {
+    background-image: linear-gradient(to right, theme('colors.primary.DEFAULT/15') 1px, transparent 1px),
+                      linear-gradient(to bottom, theme('colors.primary.DEFAULT/15') 1px, transparent 1px);
+  }
+
   :root {
     --background: 0 0% 98%;
     --foreground: 222.2 84% 4.9%;
