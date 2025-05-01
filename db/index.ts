@@ -3,14 +3,8 @@ import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
 
-// This is the correct way neon config with SSL configuration
+// Configure Neon database with WebSocket support
 neonConfig.webSocketConstructor = ws;
-// Disable strict certificate checking for WebSocket connections
-neonConfig.wsProxy = (url) => {
-  const proxyUrl = new URL(url);
-  proxyUrl.searchParams.append('ssl', 'true');
-  return proxyUrl.toString();
-};
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
