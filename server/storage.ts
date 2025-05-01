@@ -1,10 +1,33 @@
 import { db } from "@db";
-import { users, resumes, resumeTemplates, apiKeys } from "@shared/schema";
+import { 
+  users, 
+  resumes, 
+  resumeTemplates, 
+  apiKeys, 
+  resumeCollaborators, 
+  resumeComments, 
+  resumeEditHistory 
+} from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "@db";
-import { InsertUser, User, InsertResume, Resume, InsertResumeTemplate, ResumeTemplate, InsertApiKey, ApiKey } from "@shared/schema";
+import { 
+  InsertUser, 
+  User, 
+  InsertResume, 
+  Resume, 
+  InsertResumeTemplate, 
+  ResumeTemplate, 
+  InsertApiKey, 
+  ApiKey,
+  InsertResumeCollaborator,
+  ResumeCollaborator,
+  InsertResumeComment,
+  ResumeComment,
+  InsertResumeEditHistory,
+  ResumeEditHistory 
+} from "@shared/schema";
 
 const PostgresSessionStore = connectPg(session);
 
@@ -13,6 +36,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   deleteUser(id: number): Promise<void>;
 
@@ -38,6 +62,24 @@ export interface IStorage {
   getAllApiKeys(): Promise<ApiKey[]>;
   updateApiKey(id: number, apiKey: Partial<InsertApiKey>): Promise<ApiKey | undefined>;
   deleteApiKey(id: number): Promise<void>;
+
+  // Resume collaborators operations
+  createResumeCollaborator(collaborator: InsertResumeCollaborator): Promise<ResumeCollaborator>;
+  getCollaborator(resumeId: number, userId: number): Promise<ResumeCollaborator | undefined>;
+  getResumeCollaborators(resumeId: number): Promise<ResumeCollaborator[]>;
+  updateResumeCollaborator(id: number, collaborator: Partial<InsertResumeCollaborator>): Promise<ResumeCollaborator | undefined>;
+  deleteResumeCollaborator(resumeId: number, userId: number): Promise<void>;
+
+  // Resume comments operations
+  createResumeComment(comment: InsertResumeComment): Promise<ResumeComment>;
+  getResumeComment(id: number): Promise<ResumeComment | undefined>;
+  getResumeComments(resumeId: number): Promise<ResumeComment[]>;
+  updateResumeComment(id: number, comment: Partial<InsertResumeComment>): Promise<ResumeComment | undefined>;
+  deleteResumeComment(id: number): Promise<void>;
+
+  // Resume edit history operations
+  createResumeEditHistory(history: InsertResumeEditHistory): Promise<ResumeEditHistory>;
+  getResumeEditHistory(resumeId: number): Promise<ResumeEditHistory[]>;
 
   // Session store
   sessionStore: session.SessionStore;
@@ -208,6 +250,116 @@ export class DatabaseStorage implements IStorage {
 
   async deleteApiKey(id: number): Promise<void> {
     await db.delete(apiKeys).where(eq(apiKeys.id, id));
+  }
+
+  // User operations
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
+    return user;
+  }
+
+  // Resume collaborators operations
+  async createResumeCollaborator(collaborator: InsertResumeCollaborator): Promise<ResumeCollaborator> {
+    const [newCollaborator] = await db.insert(resumeCollaborators).values(collaborator).returning();
+    return newCollaborator;
+  }
+
+  async getCollaborator(resumeId: number, userId: number): Promise<ResumeCollaborator | undefined> {
+    const collaborator = await db.query.resumeCollaborators.findFirst({
+      where: and(
+        eq(resumeCollaborators.resumeId, resumeId),
+        eq(resumeCollaborators.userId, userId)
+      ),
+    });
+    return collaborator;
+  }
+
+  async getResumeCollaborators(resumeId: number): Promise<ResumeCollaborator[]> {
+    const collaborators = await db.query.resumeCollaborators.findMany({
+      where: eq(resumeCollaborators.resumeId, resumeId),
+      with: {
+        user: true,
+      },
+      orderBy: [desc(resumeCollaborators.createdAt)],
+    });
+    return collaborators;
+  }
+
+  async updateResumeCollaborator(id: number, collaborator: Partial<InsertResumeCollaborator>): Promise<ResumeCollaborator | undefined> {
+    const [updatedCollaborator] = await db
+      .update(resumeCollaborators)
+      .set(collaborator)
+      .where(eq(resumeCollaborators.id, id))
+      .returning();
+    return updatedCollaborator;
+  }
+
+  async deleteResumeCollaborator(resumeId: number, userId: number): Promise<void> {
+    await db.delete(resumeCollaborators).where(
+      and(
+        eq(resumeCollaborators.resumeId, resumeId),
+        eq(resumeCollaborators.userId, userId)
+      )
+    );
+  }
+
+  // Resume comments operations
+  async createResumeComment(comment: InsertResumeComment): Promise<ResumeComment> {
+    const [newComment] = await db.insert(resumeComments).values(comment).returning();
+    return newComment;
+  }
+
+  async getResumeComment(id: number): Promise<ResumeComment | undefined> {
+    const comment = await db.query.resumeComments.findFirst({
+      where: eq(resumeComments.id, id),
+      with: {
+        user: true,
+      },
+    });
+    return comment;
+  }
+
+  async getResumeComments(resumeId: number): Promise<ResumeComment[]> {
+    const comments = await db.query.resumeComments.findMany({
+      where: eq(resumeComments.resumeId, resumeId),
+      with: {
+        user: true,
+      },
+      orderBy: [desc(resumeComments.createdAt)],
+    });
+    return comments;
+  }
+
+  async updateResumeComment(id: number, comment: Partial<InsertResumeComment>): Promise<ResumeComment | undefined> {
+    const [updatedComment] = await db
+      .update(resumeComments)
+      .set({ ...comment, updatedAt: new Date() })
+      .where(eq(resumeComments.id, id))
+      .returning();
+    return updatedComment;
+  }
+
+  async deleteResumeComment(id: number): Promise<void> {
+    await db.delete(resumeComments).where(eq(resumeComments.id, id));
+  }
+
+  // Resume edit history operations
+  async createResumeEditHistory(history: InsertResumeEditHistory): Promise<ResumeEditHistory> {
+    const [newHistory] = await db.insert(resumeEditHistory).values(history).returning();
+    return newHistory;
+  }
+
+  async getResumeEditHistory(resumeId: number): Promise<ResumeEditHistory[]> {
+    const history = await db.query.resumeEditHistory.findMany({
+      where: eq(resumeEditHistory.resumeId, resumeId),
+      with: {
+        user: true,
+      },
+      orderBy: [desc(resumeEditHistory.createdAt)],
+    });
+    return history;
   }
 }
 
