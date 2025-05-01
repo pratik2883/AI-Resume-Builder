@@ -102,8 +102,11 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/logout", (req, res, next) => {
-    req.logout((err) => {
+    // @ts-ignore: req.logout() requires a callback in Express 4, but the type definition might be incorrect
+    req.logout();
+    req.session.destroy((err: any) => {
       if (err) return next(err);
+      res.clearCookie('connect.sid');
       res.sendStatus(200);
     });
   });
