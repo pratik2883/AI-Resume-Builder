@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -19,10 +19,10 @@ export const usersRelations = relations(users, ({ many }) => ({
 }));
 
 export const insertUserSchema = createInsertSchema(users, {
-  username: (schema) => schema.min(3, "Username must be at least 3 characters"),
-  password: (schema) => schema.min(6, "Password must be at least 6 characters"),
-  email: (schema) => schema.email("Must provide a valid email"),
-  name: (schema) => schema.min(2, "Name must be at least 2 characters"),
+  username: (schema: any) => schema.min(3, "Username must be at least 3 characters"),
+  password: (schema: any) => schema.min(6, "Password must be at least 6 characters"),
+  email: (schema: any) => schema.email("Must provide a valid email"),
+  name: (schema: any) => schema.min(2, "Name must be at least 2 characters"),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -41,9 +41,9 @@ export const apiKeys = pgTable("api_keys", {
 });
 
 export const insertApiKeySchema = createInsertSchema(apiKeys, {
-  name: (schema) => schema.min(2, "Name must be at least 2 characters"),
-  key: (schema) => schema.min(10, "Key is required"),
-  provider: (schema) => schema.min(2, "Provider is required"),
+  name: (schema: any) => schema.min(2, "Name must be at least 2 characters"),
+  key: (schema: any) => schema.min(10, "Key is required"),
+  provider: (schema: any) => schema.min(2, "Provider is required"),
 });
 
 export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
@@ -61,10 +61,10 @@ export const resumeTemplates = pgTable("resume_templates", {
 });
 
 export const insertResumeTemplateSchema = createInsertSchema(resumeTemplates, {
-  name: (schema) => schema.min(2, "Name must be at least 2 characters"),
-  description: (schema) => schema.min(2, "Description is required"),
-  thumbnail: (schema) => schema.min(2, "Thumbnail URL is required"),
-  htmlTemplate: (schema) => schema.min(2, "HTML template is required"),
+  name: (schema: any) => schema.min(2, "Name must be at least 2 characters"),
+  description: (schema: any) => schema.min(2, "Description is required"),
+  thumbnail: (schema: any) => schema.min(2, "Thumbnail URL is required"),
+  htmlTemplate: (schema: any) => schema.min(2, "HTML template is required"),
 });
 
 export type InsertResumeTemplate = z.infer<typeof insertResumeTemplateSchema>;
@@ -88,7 +88,7 @@ export const resumesRelations = relations(resumes, ({ one }) => ({
 }));
 
 export const insertResumeSchema = createInsertSchema(resumes, {
-  name: (schema) => schema.min(2, "Name must be at least 2 characters"),
+  name: (schema: any) => schema.min(2, "Name must be at least 2 characters"),
 });
 
 export type InsertResume = z.infer<typeof insertResumeSchema>;
@@ -177,8 +177,8 @@ export const resumeCollaboratorsRelations = relations(resumeCollaborators, ({ on
 }));
 
 export const insertResumeCollaboratorSchema = createInsertSchema(resumeCollaborators, {
-  permission: (schema) => schema.refine(
-    val => ['view', 'edit', 'comment'].includes(val),
+  permission: (schema: any) => schema.refine(
+    (val: any) => ['view', 'edit', 'comment'].includes(val),
     "Permission must be 'view', 'edit', or 'comment'"
   ),
 });
@@ -205,7 +205,7 @@ export const resumeCommentsRelations = relations(resumeComments, ({ one }) => ({
 }));
 
 export const insertResumeCommentSchema = createInsertSchema(resumeComments, {
-  content: (schema) => schema.min(1, "Comment content cannot be empty"),
+  content: (schema: any) => schema.min(1, "Comment content cannot be empty"),
 });
 
 export type InsertResumeComment = z.infer<typeof insertResumeCommentSchema>;
@@ -229,8 +229,8 @@ export const resumeEditHistoryRelations = relations(resumeEditHistory, ({ one })
 }));
 
 export const insertResumeEditHistorySchema = createInsertSchema(resumeEditHistory, {
-  action: (schema) => schema.refine(
-    val => ['add', 'update', 'delete'].includes(val),
+  action: (schema: any) => schema.refine(
+    (val: any) => ['add', 'update', 'delete'].includes(val),
     "Action must be 'add', 'update', or 'delete'"
   ),
 });
