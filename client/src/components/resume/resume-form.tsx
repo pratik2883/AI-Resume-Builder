@@ -574,9 +574,9 @@ export default function ResumeForm({
             
             {resumeContent.skills && resumeContent.skills.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {resumeContent.skills.map((skill) => (
+                {resumeContent.skills.map((skill, index) => (
                   <Badge
-                    key={skill.id}
+                    key={skill.id || `skill-${index}`}
                     className="px-3 py-1 text-sm cursor-default flex items-center gap-2"
                     variant="secondary"
                   >
