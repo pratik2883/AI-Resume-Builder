@@ -162,13 +162,23 @@ export async function generatePDF(
     </html>
     `;
 
-    // Create a temporary div to hold the complete HTML
-    const container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.innerHTML = completeHtml;
-    document.body.appendChild(container);
+    // Create a temporary iframe to render the HTML properly
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '0';
+    iframe.style.width = '794px'; // A4 width in pixels at 96 DPI
+    iframe.style.height = '1123px'; // A4 height
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+    
+    // Write the complete HTML to the iframe
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(completeHtml);
+      iframeDoc.close();
+    }
 
     console.log('Generating PDF with template:', template.name);
     
@@ -195,16 +205,21 @@ export async function generatePDF(
 
     // Generate PDF
     try {
+      // Make sure we use the document element from the iframe
+      const element = iframeDoc?.documentElement || iframe;
+      
+      console.log('Using element for PDF generation:', element.tagName);
+      
       const pdf = await html2pdf()
-        .from(container.querySelector('body'))
+        .from(element)
         .set(options)
         .save();
       
-      document.body.removeChild(container);
+      document.body.removeChild(iframe);
       return pdf;
     } catch (error) {
       console.error('PDF generation error details:', error);
-      document.body.removeChild(container);
+      document.body.removeChild(iframe);
       throw error;
     }
   } catch (error) {
@@ -365,17 +380,30 @@ export async function generatePreviewImage(
     </html>
     `;
 
-    // Create a temporary div to hold the complete HTML
-    const container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.innerHTML = completeHtml;
-    document.body.appendChild(container);
+    // Create a temporary iframe to render the HTML properly
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '0';
+    iframe.style.width = '794px'; // A4 width in pixels at 96 DPI
+    iframe.style.height = '1123px'; // A4 height
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+    
+    // Write the complete HTML to the iframe
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(completeHtml);
+      iframeDoc.close();
+    }
 
     // Use html2canvas to create an image
     try {
-      const canvas = await html2pdf.html2canvas(container.querySelector('body'), { 
+      // Make sure we use the document element from the iframe
+      const element = iframeDoc?.documentElement || iframe;
+      
+      const canvas = await html2pdf.html2canvas(element, { 
         scale: 1,
         useCORS: true,
         logging: false,
@@ -385,11 +413,11 @@ export async function generatePreviewImage(
         width: 800,
         height: 1132 // A4 ratio
       });
-      document.body.removeChild(container);
+      document.body.removeChild(iframe);
       return canvas.toDataURL('image/jpeg', 0.9);
     } catch (error) {
       console.error('Preview generation error details:', error);
-      document.body.removeChild(container);
+      document.body.removeChild(iframe);
       throw error;
     }
   } catch (error) {
