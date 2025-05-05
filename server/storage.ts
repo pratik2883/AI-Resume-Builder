@@ -10,7 +10,7 @@ import {
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import session from "express-session";
-import connectPg from "connect-pg-simple";
+import MySQLStore from "express-mysql-session";
 import { pool } from "@db";
 import { 
   InsertUser, 
@@ -29,7 +29,7 @@ import {
   ResumeEditHistory 
 } from "@shared/schema";
 
-const PostgresSessionStore = connectPg(session);
+const MySqlSessionStore = MySQLStore(session);
 
 export interface IStorage {
   // User operations
@@ -89,10 +89,21 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.SessionStore;
 
   constructor() {
-    this.sessionStore = new PostgresSessionStore({
-      pool,
-      createTableIfMissing: true,
-    });
+    // Parse the database URL to create the MySQL session store options
+    const dbUrl = process.env.DATABASE_URL || '';
+    // The MySQL session store requires separate connection options
+    this.sessionStore = new MySqlSessionStore({
+      // MySQL options will come from the pool we already created
+      createDatabaseTable: true,
+      schema: {
+        tableName: 'sessions',
+        columnNames: {
+          session_id: 'session_id',
+          expires: 'expires',
+          data: 'data'
+        }
+      }
+    }, pool);
   }
 
   // User operations

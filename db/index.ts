@@ -1,11 +1,6 @@
-import { Pool } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import mysql from 'mysql2/promise';
+import { drizzle } from 'drizzle-orm/mysql2';
 import * as schema from "@shared/schema";
-
-// Configure Neon database with WebSocket support
-import { neonConfig } from '@neondatabase/serverless';
-neonConfig.webSocketConstructor = ws;
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -13,12 +8,14 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Configure the pool with SSL settings to handle expired certificates
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+// Create a MySQL connection pool
+export const pool = mysql.createPool({
+  uri: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false, // This allows expired or self-signed certificates (only use in development)
-  }
+    rejectUnauthorized: false // This allows expired or self-signed certificates (only use in development)
+  },
+  connectionLimit: 10
 });
 
-export const db = drizzle(pool, { schema });
+// Create a Drizzle instance using the pool
+export const db = drizzle(pool, { schema, mode: 'default' });
