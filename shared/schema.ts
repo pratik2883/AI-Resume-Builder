@@ -1,15 +1,15 @@
-import { mysqlTable, int, varchar, text, boolean, timestamp, json } from "drizzle-orm/mysql-core";
+import { pgTable, serial, text, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
 // Users Table
-export const users = mysqlTable("users", {
-  id: int("id").primaryKey().autoincrement(),
-  username: varchar("username", { length: 255 }).notNull().unique(),
-  password: varchar("password", { length: 255 }).notNull(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  name: varchar("name", { length: 255 }).notNull(),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -30,11 +30,11 @@ export const userSelectSchema = createSelectSchema(users);
 export type User = z.infer<typeof userSelectSchema>;
 
 // API Keys
-export const apiKeys = mysqlTable("api_keys", {
-  id: int("id").primaryKey().autoincrement(),
-  name: varchar("name", { length: 255 }).notNull(),
-  key: varchar("key", { length: 255 }).notNull(),
-  provider: varchar("provider", { length: 255 }).notNull(),
+export const apiKeys = pgTable("api_keys", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  key: text("key").notNull(),
+  provider: text("provider").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -51,11 +51,11 @@ export const apiKeySelectSchema = createSelectSchema(apiKeys);
 export type ApiKey = z.infer<typeof apiKeySelectSchema>;
 
 // Resume Templates
-export const resumeTemplates = mysqlTable("resume_templates", {
-  id: int("id").primaryKey().autoincrement(),
-  name: varchar("name", { length: 255 }).notNull(),
+export const resumeTemplates = pgTable("resume_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
   description: text("description").notNull(),
-  thumbnail: varchar("thumbnail", { length: 255 }).notNull(),
+  thumbnail: text("thumbnail").notNull(),
   htmlTemplate: text("html_template").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -72,12 +72,12 @@ export const resumeTemplateSelectSchema = createSelectSchema(resumeTemplates);
 export type ResumeTemplate = z.infer<typeof resumeTemplateSelectSchema>;
 
 // Resumes Table
-export const resumes = mysqlTable("resumes", {
-  id: int("id").primaryKey().autoincrement(),
-  name: varchar("name", { length: 255 }).notNull(),
-  userId: int("user_id").references(() => users.id).notNull(),
-  templateId: int("template_id").references(() => resumeTemplates.id).notNull(),
-  content: json("content").notNull(),
+export const resumes = pgTable("resumes", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  userId: serial("user_id").references(() => users.id).notNull(),
+  templateId: serial("template_id").references(() => resumeTemplates.id).notNull(),
+  content: jsonb("content").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -161,11 +161,11 @@ export type SkillItem = z.infer<typeof skillItemSchema>;
 export type ProjectItem = z.infer<typeof projectItemSchema>;
 
 // Resume Collaborators
-export const resumeCollaborators = mysqlTable("resume_collaborators", {
-  id: int("id").primaryKey().autoincrement(),
-  resumeId: int("resume_id").references(() => resumes.id).notNull(),
-  userId: int("user_id").references(() => users.id).notNull(),
-  permission: varchar("permission", { length: 50 }).notNull(), // 'view', 'edit', 'comment'
+export const resumeCollaborators = pgTable("resume_collaborators", {
+  id: serial("id").primaryKey(),
+  resumeId: serial("resume_id").references(() => resumes.id).notNull(),
+  userId: serial("user_id").references(() => users.id).notNull(),
+  permission: text("permission").notNull(), // 'view', 'edit', 'comment'
   invitedAt: timestamp("invited_at").defaultNow().notNull(),
   acceptedAt: timestamp("accepted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -188,12 +188,12 @@ export const resumeCollaboratorSelectSchema = createSelectSchema(resumeCollabora
 export type ResumeCollaborator = z.infer<typeof resumeCollaboratorSelectSchema>;
 
 // Resume Comments
-export const resumeComments = mysqlTable("resume_comments", {
-  id: int("id").primaryKey().autoincrement(),
-  resumeId: int("resume_id").references(() => resumes.id).notNull(),
-  userId: int("user_id").references(() => users.id).notNull(),
+export const resumeComments = pgTable("resume_comments", {
+  id: serial("id").primaryKey(),
+  resumeId: serial("resume_id").references(() => resumes.id).notNull(),
+  userId: serial("user_id").references(() => users.id).notNull(),
   content: text("content").notNull(),
-  section: varchar("section", { length: 255 }).notNull(), // Which section of the resume (e.g., 'personalInfo', 'education.0', etc.)
+  section: text("section").notNull(), // Which section of the resume (e.g., 'personalInfo', 'education.0', etc.)
   resolved: boolean("resolved").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -213,13 +213,13 @@ export const resumeCommentSelectSchema = createSelectSchema(resumeComments);
 export type ResumeComment = z.infer<typeof resumeCommentSelectSchema>;
 
 // Resume Edit History
-export const resumeEditHistory = mysqlTable("resume_edit_history", {
-  id: int("id").primaryKey().autoincrement(),
-  resumeId: int("resume_id").references(() => resumes.id).notNull(),
-  userId: int("user_id").references(() => users.id).notNull(),
-  contentSnapshot: json("content_snapshot").notNull(),
-  section: varchar("section", { length: 255 }).notNull(), // Which section was edited
-  action: varchar("action", { length: 50 }).notNull(), // 'add', 'update', 'delete'
+export const resumeEditHistory = pgTable("resume_edit_history", {
+  id: serial("id").primaryKey(),
+  resumeId: serial("resume_id").references(() => resumes.id).notNull(),
+  userId: serial("user_id").references(() => users.id).notNull(),
+  contentSnapshot: jsonb("content_snapshot").notNull(),
+  section: text("section").notNull(), // Which section was edited
+  action: text("action").notNull(), // 'add', 'update', 'delete'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
