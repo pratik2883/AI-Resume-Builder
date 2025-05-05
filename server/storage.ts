@@ -12,6 +12,14 @@ import { eq, and, desc } from "drizzle-orm";
 import session from "express-session";
 import MySQLStore from "express-mysql-session";
 import { pool } from "@db";
+
+// Create a type definition for MySQL session store
+declare module "express-session" {
+  interface SessionStore {}
+}
+
+// Use the mysql pool from our db connection
+const MySQLSessionStore = MySQLStore(session);
 import { 
   InsertUser, 
   User, 
@@ -29,7 +37,7 @@ import {
   ResumeEditHistory 
 } from "@shared/schema";
 
-const MySqlSessionStore = MySQLStore(session);
+
 
 export interface IStorage {
   // User operations
@@ -92,7 +100,7 @@ export class DatabaseStorage implements IStorage {
     // Parse the database URL to create the MySQL session store options
     const dbUrl = process.env.DATABASE_URL || '';
     // The MySQL session store requires separate connection options
-    this.sessionStore = new MySqlSessionStore({
+    this.sessionStore = new MySQLSessionStore({
       // MySQL options will come from the pool we already created
       createDatabaseTable: true,
       schema: {
